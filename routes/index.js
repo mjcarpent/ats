@@ -36,7 +36,7 @@ async function authenticate() {
         }
     );
 
-    // console.log("JWT: " + JSON.stringify(response.data.token));
+    console.log("JWT: " + JSON.stringify(response.data.token));
     return response.data.token;
 }
 
