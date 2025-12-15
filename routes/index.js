@@ -90,16 +90,15 @@ async function writeCDRS(data) {
         for (let i = 0; i < data.length; i++) {
 
             try {
-                await conn.query('INSERT INTO cdrs(`cust_id`, `id`, `caller_id`, `seq`, `added_dt`, `start_time`, `end_time`) VALUES(?, ?, ?, ?, ?, ?, ?)',
+                // Could do a batch insert
+                await conn.query('INSERT IGNORE INTO cdrs(`cust_id`, `id`, `caller_id`, `seq`, `added_dt`, `start_time`, `end_time`) VALUES(?, ?, ?, ?, ?, ?, ?)',
                     [
                         data[i].cust_id, data[i].id, data[i].caller_id, data[i].seq, data[i].added_dt, data[i].start_time, data[i].end_time
                     ]
                 );
             }
             catch (err) {
-                if (err.code != "ER_DUP_ENTRY") {
-                    console.error("writeCDRS: Failure inserting data\n" + JSON.stringify(err));
-                }
+                console.error("writeCDRS: Failure inserting data\n" + JSON.stringify(err));
             }
         }
     }
