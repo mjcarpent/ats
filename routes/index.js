@@ -6,7 +6,7 @@ import mariadb from 'mariadb';
 
 const httpsAgent = new https.Agent({
     keepAlive: true,       // keep the connection open
-    keepAliveMsecs: 10000, // optional tuning
+    keepAliveMsecs: 10000  // optional tuning
 });
 
 const router = express.Router();
@@ -33,10 +33,12 @@ async function authenticate() {
                 username: user,
                 password: pass,
             },
+            httpsAgent,
+            timeout: 10000
         }
     );
 
-    console.log("JWT: " + JSON.stringify(response.data.token));
+    // console.log("JWT: " + JSON.stringify(response.data.token));
     return response.data.token;
 }
 
@@ -57,15 +59,20 @@ async function getCDRS() {
             }
         );
         
+        // Assuming that there is always a complete JSON payload
         response.data.on("data", chunk => {
-            writeCDRS(JSON.parse(chunk.toString()));
             //console.log("CDR chunk:", chunk.toString());
+            writeCDRS(JSON.parse(chunk.toString()));
+            
         });
 
         response.data.on("end", () => {
             console.log("CDR stream ended");
         });
 
+        response.data.on("error", err => {
+            console.error("CDR stream error:", err);
+        });
         //console.log("DATA: " + JSON.stringify(response.data));
     }
     catch (error) {
@@ -80,7 +87,6 @@ async function writeCDRS(data) {
     try {
 
         conn = await pool.getConnection();
-
         for (let i = 0; i < data.length; i++) {
 
             try {
@@ -116,7 +122,7 @@ router.get('/details', async function(req, res, next) {
 
         conn = await pool.getConnection();
         const result = await conn.query('SELECT * FROM cdrs ORDER BY start_time DESC;');
-        res.json(JSON.parse(JSON.stringify(result, (key, value) => typeof value === "bigint" ? Number(value) : value)));
+        res.json(result);
     }
     catch (error) {
         console.error("Error[GET /details]: Failure executing query\n" + JSON.stringify(error));
@@ -139,7 +145,7 @@ router.get('/summary', async function(req, res, next) {
 
         conn = await pool.getConnection();
         const result = await conn.query('SELECT id, DATE(start_time) AS call_date, COUNT(*) AS cdr_count FROM cdrs WHERE cust_id = ? GROUP BY id, DATE(start_time) ORDER BY call_date DESC;', [cust_id]);
-        res.json(JSON.parse(JSON.stringify(result, (key, value) => typeof value === "bigint" ? Number(value) : value)));
+        res.json(result);
     }
     catch (error) {
         console.error("Error[GET /summary]: Failure executing query\n" + JSON.stringify(error));
@@ -160,7 +166,7 @@ router.get('/logs', async function(req, res, next) {
 
         conn = await pool.getConnection();
         const result = await conn.query('SELECT * FROM cdrs  ORDER BY added_dt DESC;');
-        res.json(JSON.parse(JSON.stringify(result, (key, value) => typeof value === "bigint" ? Number(value) : value)));
+        res.json(result);
     }
     catch (error) {
         console.error("Error[GET /logs]: Failure executing query\n" + JSON.stringify(error));
@@ -178,7 +184,10 @@ router.get('/', function(req, res, next) {
     res.render('index', { title: 'Express' });
 });
 
-getCDRS();
+getCDRS().catch(err => {
+  console.error("Failed to start CDR ingestion:", err);
+  process.exit(1);
+});
 
 export default router;
 // module.exports = router;
